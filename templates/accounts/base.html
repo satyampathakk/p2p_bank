@@ -13,7 +13,10 @@
             {% if user.is_authenticated %}
                 <div class="space-x-4">
                     <a href="{% url 'dashboard' %}" class="hover:text-blue-200">Dashboard</a>
-                    <a href="{% url 'logout' %}" class="hover:text-blue-200">Logout</a>
+                    <form action="{% url 'logout' %}" method="post" id="logout-form" style="display: inline;">
+                        {% csrf_token %}
+                        <a href="#" onclick="document.getElementById('logout-form').submit();" class="hover:text-blue-200 text-gray-700">Logout</a>
+                    </form>
                 </div>
             {% endif %}
         </div>

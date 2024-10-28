@@ -83,3 +83,5 @@ STRIPE_SECRET_KEY = 'sk_test_your_key'
 
 LOGIN_REDIRECT_URL = 'dashboard'
 LOGIN_URL = 'login'
+RAZORPAY_KEY_ID = 'rzp_test_Qoih6Lsd1Dc6AJ'
+RAZORPAY_KEY_SECRET = 'V5TzTYq49FA2nX2mckBWrmTJ'

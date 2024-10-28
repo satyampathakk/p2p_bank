@@ -7,7 +7,9 @@ import stripe
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-
+from decimal import Decimal
+import razorpay
+import json
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 @login_required
@@ -18,18 +20,26 @@ def dashboard(request):
         'account': account,
         'transactions': transactions
     })
-
 @login_required
 def deposit(request):
     if request.method == 'POST':
-        amount = Decimal(request.POST.get('amount'))
+        data = json.loads(request.body)
+        am = Decimal(data.get('amount'))
+        print(am)
+        amount = am
+        
+        # Initialize Razorpay client
+        client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+        
         try:
-            # Create Stripe payment intent
-            intent = stripe.PaymentIntent.create(
-                amount=int(amount * 100),  # Convert to cents
-                currency='usd',
-            )
-            
+            # Create Razorpay order
+            order_data = {
+                'amount': int(amount * 100),  # Convert to paise
+                'currency': 'INR',  # Change to INR if you're using Indian currency
+                'payment_capture': '1'  # Auto capture payment
+            }
+            order = client.order.create(data=order_data)
+
             # Create transaction record
             account = Account.objects.get(user=request.user)
             Transaction.objects.create(
@@ -38,16 +48,15 @@ def deposit(request):
                 amount=amount,
                 status='pending'
             )
-            
             return JsonResponse({
-                'clientSecret': intent.client_secret,
+                'orderId': order['id'],  # Return the order ID to the client
                 'amount': amount
             })
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=400)
     
     return render(request, 'accounts/deposit.html', {
-        'stripe_public_key': settings.STRIPE_PUBLIC_KEY
+        'razorpay_key_id': settings.RAZORPAY_KEY_ID  # Pass Razorpay key to the template
     })
 
 @login_required
@@ -110,38 +119,38 @@ def transfer(request):
     
     return render(request, 'accounts/transfer.html')
 
-@csrf_exempt
-def stripe_webhook(request):
-    payload = request.body
-    sig_header = request.META['HTTP_STRIPE_SIGNATURE']
+@login_required
+def confirm_payment(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        payment_id = data.get('payment_id')
+        amount = data.get('amount')
 
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except ValueError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-    except stripe.error.SignatureVerificationError as e:
-        return JsonResponse({'error': str(e)}, status=400)
-
-    if event['type'] == 'payment_intent.succeeded':
-        payment_intent = event['data']['object']
-        amount = Decimal(payment_intent.amount) / 100  # Convert from cents
-        
-        # Update account balance and transaction status
         try:
-            transaction = Transaction.objects.get(
-                status='pending',
-                amount=amount
-            )
-            account = transaction.account
-            account.balance += amount
-            account.save()
-            
-            transaction.status = 'completed'
-            transaction.save()
-            
-        except Transaction.DoesNotExist:
-            return JsonResponse({'error': 'Transaction not found'}, status=400)
+            # Initialize Razorpay client
+            client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+            payment = client.payment.fetch(payment_id)
 
-    return JsonResponse({'status': 'success'})
+            # Check if payment is captured
+            if payment['status'] == 'captured':
+                # Payment was successful
+                account = Account.objects.get(user=request.user)
+                account.balance += Decimal(amount)  # Update the account balance
+                account.save()
+
+                # Create transaction record
+                Transaction.objects.create(
+                    account=account,
+                    transaction_type='DEP',
+                    amount=Decimal(amount),
+                    status='completed'  # Update status here
+                )
+
+                return JsonResponse({'success': True})
+            else:
+                return JsonResponse({'error': 'Payment not captured'}, status=400)
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=400)
+
+    return JsonResponse({'error': 'Invalid request'}, status=400)
