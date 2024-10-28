@@ -1,0 +1,61 @@
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Account Overview</h2>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <p class="text-gray-600">Account Number</p>
+                <p class="text-xl font-semibold">{{ account.account_number }}</p>
+            </div>
+            <div>
+                <p class="text-gray-600">Current Balance</p>
+                <p class="text-xl font-semibold">${{ account.balance }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-4 mb-8">
+        <a href="{% url 'deposit' %}" class="bg-green-500 text-white rounded-lg p-4 text-center hover:bg-green-600">
+            Deposit
+        </a>
+        <a href="{% url 'withdraw' %}" class="bg-red-500 text-white rounded-lg p-4 text-center hover:bg-red-600">
+            Withdraw
+        </a>
+        <a href="{% url 'transfer' %}" class="bg-blue-500 text-white rounded-lg p-4 text-center hover:bg-blue-600">
+            Transfer
+        </a>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-2xl font-bold mb-4">Recent Transactions</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left p-2">Type</th>
+                        <th class="text-left p-2">Amount</th>
+                        <th class="text-left p-2">Date</th>
+                        <th class="text-left p-2">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr class="border-b">
+                        <td class="p-2">{{ transaction.get_transaction_type_display }}</td>
+                        <td class="p-2">${{ transaction.amount }}</td>
+                        <td class="p-2">{{ transaction.timestamp|date:"M d, Y H:i" }}</td>
+                        <td class="p-2">{{ transaction.status }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="p-2 text-center text-gray-500">No transactions yet</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
